@@ -1,0 +1,6 @@
+venv-emotion/
+venv-judge/
+venv-orchestrator/
+__pycache__/
+*.pyc
+.DS_Store

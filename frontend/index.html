@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DebateArena — LLM vs LLM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #080810;
+    --surface:   #0F0F1A;
+    --border:    #1E1E30;
+    --text:      #E2E8F0;
+    --muted:     #94A3B8;
+    --rose:      #F43F5E;
+    --rose-dim:  rgba(244,63,94,0.15);
+    --teal:      #2DD4BF;
+    --teal-dim:  rgba(45,212,191,0.15);
+    --gold:      #FBBF24;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Setup screen ─────────────────────────────────────────────────────── */
+  #setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    gap: 2rem;
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--teal) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.95rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem;
+    padding: 0.65rem 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--teal);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, var(--rose) 0%, #be123c 100%);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.85rem 2rem;
+    text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s;
+    width: 100%;
+  }
+
+  .btn-start:hover  { opacity: 0.9; }
+  .btn-start:active { transform: scale(0.98); }
+
+  /* ── Arena screen ─────────────────────────────────────────────────────── */
+  #arena-screen {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 1.5rem 2rem 4rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    gap: 1.5rem;
+  }
+
+  .arena-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
+  }
+
+  .arena-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .arena-topic {
+    font-size: 1rem;
+    color: var(--text);
+    max-width: 600px;
+    text-align: center;
+  }
+
+  /* ── Host banner ──────────────────────────────────────────────────────── */
+  #host-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    font-size: 0.95rem;
+    color: var(--gold);
+    font-style: italic;
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  #host-banner .host-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+  /* ── Score bar ────────────────────────────────────────────────────────── */
+  .score-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+  }
+
+  .speaker-label {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .speaker-label.rose { color: var(--rose); }
+  .speaker-label.teal { color: var(--teal); }
+  .speaker-label.teal { text-align: right; }
+
+  .composure-track {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+    position: relative;
+  }
+
+  .composure-fill-rose {
+    height: 100%;
+    background: var(--rose);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 50%;
+  }
+
+  .composure-fill-teal {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 50%;
+    margin-left: auto;
+  }
+
+  .vs-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  .composure-val {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Debate columns ───────────────────────────────────────────────────── */
+  .debate-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    flex: 1;
+  }
+
+  .column-header {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid;
+    margin-bottom: 1rem;
+  }
+
+  .column-header.rose { color: var(--rose); border-color: var(--rose); }
+  .column-header.teal { color: var(--teal); border-color: var(--teal); }
+
+  .argument-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .arg-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    animation: fadeIn 0.35s ease;
+  }
+
+  .arg-card.rose { border-left: 3px solid var(--rose); background: var(--rose-dim); }
+  .arg-card.teal { border-left: 3px solid var(--teal); background: var(--teal-dim); }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .arg-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .arg-round {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .arg-emotion {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .arg-text {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+  }
+
+  .arg-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .composure-chip {
+    font-size: 0.72rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+  }
+
+  .listen-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .listen-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ── Coach log card ───────────────────────────────────────────────────── */
+  .coach-card {
+    background: rgba(251,191,36,0.08);
+    border: 1px dashed var(--gold);
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    animation: fadeIn 0.35s ease;
+    text-align: center;
+  }
+
+  .coach-card .coach-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.3rem;
+  }
+
+  .coach-card .coach-text {
+    font-size: 0.88rem;
+    color: var(--text);
+    font-style: italic;
+  }
+
+  /* ── Winner banner ────────────────────────────────────────────────────── */
+  #winner-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(251,191,36,0.05) 100%);
+    border: 1px solid var(--gold);
+    border-radius: 14px;
+    padding: 1.5rem 2rem;
+    text-align: center;
+    gap: 0.5rem;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #winner-banner h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.5rem;
+    color: var(--gold);
+  }
+
+  #winner-banner p { color: var(--muted); font-size: 0.9rem; max-width: 600px; }
+
+  /* ── Coach panel ──────────────────────────────────────────────────────── */
+  #coach-panel {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1.25rem;
+  }
+
+  #coach-panel input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.9rem;
+    outline: none;
+  }
+
+  #coach-panel input:focus { border-color: var(--gold); }
+
+  #coach-send {
+    background: var(--gold);
+    border: none;
+    border-radius: 8px;
+    color: #1a1a1a;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.6rem 1.1rem;
+    text-transform: uppercase;
+  }
+
+  #coach-send:hover { opacity: 0.9; }
+
+  /* ── Status + speed control (compact, inline) ─────────────────────────── */
+  #status-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+  }
+
+  #status-bar {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    text-align: center;
+  }
+
+  .speed-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  #speed-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.4rem;
+    outline: none;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--teal);
+    margin-right: 6px;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+</style>
+</head>
+<body>
+
+<!-- ── Setup screen ──────────────────────────────────────────────────────── -->
+<div id="setup-screen">
+  <div class="logo">DEBATE ARENA</div>
+  <div class="tagline">LLM &nbsp;vs&nbsp; LLM &nbsp;·&nbsp; Bauhaus-Universität Weimar</div>
+
+  <div class="setup-card">
+    <div class="field">
+      <label>Debate Topic</label>
+      <input id="topic" type="text" placeholder="e.g. AI should replace human judges in debates" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>LLM-A Name (Pro)</label>
+        <input id="llm-a" type="text" value="Qwen-Pro" />
+      </div>
+      <div class="field">
+        <label>LLM-B Name (Con)</label>
+        <input id="llm-b" type="text" value="Qwen-Con" />
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Total Turns (even)</label>
+        <select id="turn-count">
+          <option value="4">4 turns (2 rounds)</option>
+          <option value="6" selected>6 turns (3 rounds)</option>
+          <option value="8">8 turns (4 rounds)</option>
+          <option value="10">10 turns (5 rounds)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ollama Model</label>
+        <input id="ollama-model" type="text" value="gemma:7b" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Ollama URL</label>
+      <input id="ollama-url" type="text" value="http://localhost:11437" />
+    </div>
+
+    <div class="field">
+      <label>Coach Opening Strategy (optional)</label>
+      <input id="coach-opening" type="text" placeholder="e.g. 'start with statistics, be confident'" />
+    </div>
+    <button class="btn-start" onclick="startDebate()">START DEBATE</button>
+  </div>
+</div>
+
+<!-- ── Arena screen ──────────────────────────────────────────────────────── -->
+<div id="arena-screen">
+
+  <div class="arena-header">
+    <div class="arena-title">DEBATE ARENA</div>
+    <div class="arena-topic" id="arena-topic-display"></div>
+    <div style="width:120px"></div>
+  </div>
+
+  <!-- Host announcement banner -->
+  <div id="host-banner">
+    <span class="host-icon">🎙</span>
+    <span id="host-text"></span>
+  </div>
+
+  <!-- Coach steering -->
+  <div id="coach-panel" style="display:none;gap:1rem;flex-direction:column;">
+    <div style="display:flex;gap:0.75rem;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0.85rem 1.25rem;">
+      <span style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--rose);font-weight:700;white-space:nowrap;">COACH A</span>
+      <input id="coach-instruction-a" type="text" placeholder="Instruct Qwen-Pro (e.g. 'be more aggressive')" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:0.9rem;padding:0.6rem 0.9rem;outline:none;" />
+      <button onclick="sendCoachInstruction('a')" style="background:var(--rose);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:'Space Mono',monospace;font-size:0.8rem;font-weight:700;padding:0.6rem 1rem;">Send</button>
+    </div>
+    <div style="display:flex;gap:0.75rem;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0.85rem 1.25rem;">
+      <span style="font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--teal);font-weight:700;white-space:nowrap;">COACH B</span>
+      <input id="coach-instruction-b" type="text" placeholder="Instruct Qwen-Con (e.g. 'use more facts')" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:0.9rem;padding:0.6rem 0.9rem;outline:none;" />
+      <button onclick="sendCoachInstruction('b')" style="background:var(--teal);border:none;border-radius:8px;color:#1a1a1a;cursor:pointer;font-family:'Space Mono',monospace;font-size:0.8rem;font-weight:700;padding:0.6rem 1rem;">Send</button>
+    </div>
+    <div style="display:flex;justify-content:center;">
+      <button id="coach-pause" onclick="togglePause()" style="background:var(--rose);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:'Space Mono',monospace;font-size:0.8rem;font-weight:700;letter-spacing:0.05em;padding:0.6rem 1.5rem;text-transform:uppercase;">Pause</button>
+    </div>
+  </div>
+
+  <!-- Score bar -->
+  <div class="score-bar">
+    <div>
+      <div class="speaker-label rose" id="label-a">LLM-A</div>
+      <div class="composure-val" id="composure-a-val">composure —</div>
+      <div class="composure-track"><div class="composure-fill-rose" id="fill-a"></div></div>
+    </div>
+
+    <div>
+      <div class="vs-label">VS</div>
+    </div>
+
+    <div style="text-align:right">
+      <div class="speaker-label teal" id="label-b">LLM-B</div>
+      <div class="composure-val" id="composure-b-val">composure —</div>
+      <div class="composure-track"><div class="composure-fill-teal" id="fill-b"></div></div>
+    </div>
+  </div>
+
+  <!-- Debate columns -->
+  <div class="debate-columns">
+    <div>
+      <div class="column-header rose" id="col-header-a">LLM-A · PRO</div>
+      <div class="argument-feed" id="feed-a"></div>
+    </div>
+    <div>
+      <div class="column-header teal" id="col-header-b">LLM-B · CON</div>
+      <div class="argument-feed" id="feed-b"></div>
+    </div>
+  </div>
+
+  <!-- Winner -->
+  <div id="winner-banner">
+    <h2 id="winner-title"></h2>
+    <p id="winner-explanation"></p>
+    <button onclick="restartDebate()" style="margin-top:1rem;background:var(--teal);border:none;border-radius:8px;color:#1a1a1a;cursor:pointer;font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;letter-spacing:0.05em;padding:0.65rem 1.5rem;text-transform:uppercase;">↺ New Debate</button>
+  </div>
+
+  <div id="status-row">
+    <span class="speed-label">SPEED</span>
+    <select id="speed-select" onchange="setPlaybackSpeed(parseFloat(this.value))">
+      <option value="0.25">0.25x</option>
+      <option value="0.5">0.5x</option>
+      <option value="1" selected>1.0x</option>
+      <option value="1.5">1.5x</option>
+      <option value="2">2.0x</option>
+    </select>
+    <span id="status-bar"></span>
+  </div>
+</div>
+
+<script>
+// ── Unified audio playback ───────────────────────────────────────────────────
+// One shared state for BOTH auto-play and manual "Listen" clicks. Whichever
+// card's audio is playing — auto or manual — that card's own button shows
+// "■ Stop" and clicking it stops it. No separate global stop button needed.
+let _audioQueue = [];
+let _audioPlaying = false;
+let _activeAudio = null;
+let _activeBtn = null;
+let _playbackSpeed = 1.0;
+
+function _playClip(b64, btn) {
+  const binary = atob(b64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'audio/wav' });
+  const url  = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.playbackRate = _playbackSpeed;
+
+  _activeAudio = audio;
+  _activeBtn = btn;
+  if (btn) btn.textContent = '■ Stop';
+
+  const done = () => {
+    URL.revokeObjectURL(url);
+    if (btn) btn.textContent = '▶ Listen';
+    if (_activeAudio === audio) { _activeAudio = null; _activeBtn = null; }
+    _audioPlaying = false;
+    _processAudioQueue();
+  };
+
+  audio.onended = done;
+  audio.play().catch(done);
+}
+
+// Used for host intro / each new argument as it auto-plays.
+// btn (optional) is that card's own Listen button, so it can show "Stop" live.
+function playBase64Audio(b64, btn = null) {
+  if (!b64) return;
+  _audioQueue.push({ b64, btn });
+  _processAudioQueue();
+}
+
+function _processAudioQueue() {
+  if (_audioPlaying || _audioQueue.length === 0) return;
+  _audioPlaying = true;
+  const { b64, btn } = _audioQueue.shift();
+  _playClip(b64, btn);
+}
+
+// Manual "Listen" button — click to play, click again while playing to stop.
+function toggleListenAudio(b64, btn) {
+  if (!b64) return;
+
+  // This exact button is the one currently playing → stop it
+  if (_activeBtn === btn && _activeAudio && !_activeAudio.paused) {
+    _activeAudio.pause();
+    btn.textContent = '▶ Listen';
+    _activeAudio = null;
+    _activeBtn = null;
+    _audioPlaying = false;
+    _processAudioQueue();
+    return;
+  }
+
+  // Something else is currently playing → stop that first
+  if (_activeAudio) {
+    _activeAudio.pause();
+    if (_activeBtn) _activeBtn.textContent = '▶ Listen';
+    _activeAudio = null;
+    _activeBtn = null;
+  }
+
+  // Manual click jumps the queue — play this one right now
+  _audioQueue = [];
+  _audioPlaying = true;
+  _playClip(b64, btn);
+}
+
+function setPlaybackSpeed(rate) {
+  _playbackSpeed = rate;
+  if (_activeAudio) _activeAudio.playbackRate = rate;
+}
+
+// ── UI helpers ───────────────────────────────────────────────────────────────
+function setStatus(msg, live = false) {
+  const bar = document.getElementById('status-bar');
+  bar.innerHTML = live
+    ? `<span class="dot"></span>${msg}`
+    : msg;
+}
+
+function showHostBanner(text, audiob64) {
+  const banner = document.getElementById('host-banner');
+  document.getElementById('host-text').textContent = text;
+  banner.style.display = 'flex';
+  playBase64Audio(audiob64);
+}
+
+function hideHostBanner() {
+  document.getElementById('host-banner').style.display = 'none';
+}
+
+function updateScores(aComp, bComp) {
+  if (aComp !== null && aComp !== undefined) {
+    document.getElementById('composure-a-val').textContent = `composure ${(aComp * 100).toFixed(0)}%`;
+    document.getElementById('fill-a').style.width = `${aComp * 100}%`;
+  }
+  if (bComp !== null && bComp !== undefined) {
+    document.getElementById('composure-b-val').textContent = `composure ${(bComp * 100).toFixed(0)}%`;
+    document.getElementById('fill-b').style.width = `${bComp * 100}%`;
+  }
+}
+
+let _cardCounter = 0;
+
+function addArgumentCard(event) {
+  const isA   = event.role === 'llm_a';
+  const feed  = document.getElementById(isA ? 'feed-a' : 'feed-b');
+  const color = isA ? 'rose' : 'teal';
+  const comp  = event.scores?.composure ?? 0.5;
+  const emotion = event.scores?.dominant_emotion ?? 'neutral';
+  const audiob64 = event.audio_b64;
+  const btnId = `listen-btn-${_cardCounter++}`;
+
+  const card = document.createElement('div');
+  card.className = `arg-card ${color}`;
+  card.innerHTML = `
+    <div class="arg-meta">
+      <span class="arg-round">Round ${event.round}</span>
+      <span class="arg-emotion">${emotion}</span>
+    </div>
+    <div class="arg-text">${escapeHtml(event.text)}</div>
+    <div class="arg-footer">
+      <span class="composure-chip">composure ${(comp * 100).toFixed(0)}%</span>
+      ${audiob64 ? `<button class="listen-btn" id="${btnId}" onclick="toggleListenAudio('${audiob64}', this)">▶ Listen</button>` : ''}
+    </div>
+  `;
+  feed.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Auto-play, passing this card's own button so it shows "Stop" while playing
+  if (audiob64) {
+    const btn = document.getElementById(btnId);
+    playBase64Audio(audiob64, btn);
+  }
+}
+
+function showWinner(event) {
+  const banner = document.getElementById('winner-banner');
+  document.getElementById('winner-title').textContent =
+    event.winner === 'tie' ? 'TIE' : `WINNER: ${event.winner}`;
+  document.getElementById('winner-explanation').textContent = event.explanation || '';
+  banner.style.display = 'flex';
+  showHostBanner(event.text, event.audio_b64);
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Coach steering ───────────────────────────────────────────────────────────
+function addCoachCard(round, instructionA, instructionB) {
+  const label = round === 0 ? 'Opening Strategy' : `After Round ${round}`;
+
+  if (instructionA) {
+    document.getElementById('feed-a').insertAdjacentHTML('beforeend', `
+      <div class="coach-card">
+        <div class="coach-label" style="color:var(--rose);">🎯 Coach A · ${label}</div>
+        <div class="coach-text">${escapeHtml(instructionA)}</div>
+      </div>`);
+  }
+  if (instructionB) {
+    document.getElementById('feed-b').insertAdjacentHTML('beforeend', `
+      <div class="coach-card">
+        <div class="coach-label" style="color:var(--teal);">🎯 Coach B · ${label}</div>
+        <div class="coach-text">${escapeHtml(instructionB)}</div>
+      </div>`);
+  }
+}
+
+let _lastCoachA = '';
+let _lastCoachB = '';
+
+function sendCoachInstruction(side) {
+  const input = document.getElementById(`coach-instruction-${side}`);
+  const instruction = input.value.trim();
+  if (!instruction) return;
+
+  if (side === 'a') _lastCoachA = instruction;
+  else _lastCoachB = instruction;
+
+  fetch(`http://localhost:8002/steer/${side}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instruction }),
+  }).then(() => {
+    setStatus(`🎯 Coach ${side.toUpperCase()}: "${instruction}" — click Resume to continue.`);
+  }).catch(() => setStatus('Failed to send instruction.'));
+
+  input.value = '';
+}
+
+// ── Pause / Resume ───────────────────────────────────────────────────────────
+let _debatePaused = false;
+
+function togglePause() {
+  const btn = document.getElementById('coach-pause');
+  if (_debatePaused) {
+    // Insert coach card before resuming
+    const round = parseInt(btn.dataset.round || '0');
+    addCoachCard(round, _lastCoachA, _lastCoachB);
+    _lastCoachA = '';
+    _lastCoachB = '';
+
+    fetch('http://localhost:8002/resume', { method: 'POST' })
+      .then(() => {
+        _debatePaused = false;
+        btn.textContent = 'Pause';
+        btn.style.background = 'var(--rose)';
+        btn.style.color = '#fff';
+        setStatus('Debate resumed…', true);
+      })
+      .catch(() => setStatus('Failed to resume.'));
+  } else {
+    // Manual pause
+    fetch('http://localhost:8002/pause', { method: 'POST' })
+      .then(() => {
+        _debatePaused = true;
+        btn.textContent = 'Resume';
+        btn.style.background = 'var(--teal)';
+        btn.style.color = '#1a1a1a';
+        setStatus('Debate paused — send a coach instruction then Resume.');
+      })
+      .catch(() => setStatus('Failed to pause.'));
+  }
+}
+
+// ── Restart ──────────────────────────────────────────────────────────────────
+function restartDebate() {
+  _debatePaused = false;
+  fetch('http://localhost:8002/resume', { method: 'POST' }).catch(() => {});
+  document.getElementById('feed-a').innerHTML = '';
+  document.getElementById('feed-b').innerHTML = '';
+  document.getElementById('winner-banner').style.display = 'none';
+  document.getElementById('host-banner').style.display = 'none';
+  document.getElementById('coach-panel').style.display = 'none';
+  document.getElementById('coach-pause').textContent = 'Pause';
+  document.getElementById('coach-pause').style.background = 'var(--rose)';
+  _lastCoachA = '';
+  _lastCoachB = '';
+  document.getElementById('fill-a').style.width = '50%';
+  document.getElementById('fill-b').style.width = '50%';
+  document.getElementById('composure-a-val').textContent = 'composure —';
+  document.getElementById('composure-b-val').textContent = 'composure —';
+  document.getElementById('arena-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('coach-opening').value = '';
+  setStatus('');
+}
+
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+function startDebate() {
+  // Unlock audio autoplay for the whole session (Safari blocks background audio otherwise)
+  const _unlock = new Audio();
+  _unlock.play().catch(() => {});
+  const topic   = document.getElementById('topic').value.trim();
+  const llmA    = document.getElementById('llm-a').value.trim()        || 'LLM-A';
+  const llmB    = document.getElementById('llm-b').value.trim()        || 'LLM-B';
+  const turns   = parseInt(document.getElementById('turn-count').value);
+  const model   = document.getElementById('ollama-model').value.trim() || 'gemma:7b';
+  const ollama  = document.getElementById('ollama-url').value.trim()   || 'http://localhost:11437';
+  const openingStrategy = document.getElementById('coach-opening').value.trim();
+
+  if (!topic) { alert('Please enter a debate topic.'); return; }
+
+  // Switch screens
+  document.getElementById('setup-screen').style.display = 'none';
+  const arena = document.getElementById('arena-screen');
+  arena.style.display = 'flex';
+
+  // Populate labels
+  document.getElementById('arena-topic-display').textContent = topic;
+  document.getElementById('label-a').textContent    = llmA;
+  document.getElementById('label-b').textContent    = llmB;
+  document.getElementById('col-header-a').textContent = `${llmA} · PRO`;
+  document.getElementById('col-header-b').textContent = `${llmB} · CON`;
+
+  setStatus('Connecting to orchestrator…', true);
+
+  const ws = new WebSocket('ws://localhost:8002/ws/debate');
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      topic,
+      llm_a: llmA,
+      llm_b: llmB,
+      turn_count: turns,
+      ollama_url: ollama,
+      ollama_model: model,
+      emotion_api: 'http://localhost:8000',
+      judge_api:   'http://localhost:8001',
+    }));
+    document.getElementById('coach-panel').style.display = 'flex';
+    setStatus('Debate starting…', true);
+    if (openingStrategy) {
+      fetch('http://localhost:8002/steer/a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction: openingStrategy }),
+      });
+      fetch('http://localhost:8002/steer/b', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction: openingStrategy }),
+      });
+      addCoachCard(0, openingStrategy, openingStrategy);
+    }
+  };
+
+  ws.onmessage = (msg) => {
+    const event = JSON.parse(msg.data);
+
+    switch (event.type) {
+      case 'host_intro':
+        showHostBanner(event.text, event.audio_b64);
+        setStatus('Round 1 in progress…', true);
+        break;
+
+      case 'argument':
+        hideHostBanner();
+        addArgumentCard(event);
+        setStatus(`Round ${event.round} — ${event.speaker} speaking…`, true);
+        break;
+
+      case 'scores_update':
+        updateScores(event.llm_a_avg_composure, event.llm_b_avg_composure);
+        break;
+
+      case 'round_complete':
+        setStatus(`Round ${event.round} complete — coach, steer or resume.`);
+        document.getElementById('coach-pause').textContent = 'Resume';
+        document.getElementById('coach-pause').style.background = 'var(--teal)';
+        document.getElementById('coach-pause').style.color = '#1a1a1a';
+        _debatePaused = true;
+        // Store round for card insertion on resume
+        document.getElementById('coach-pause').dataset.round = event.round;
+        break;
+
+      case 'winner':
+        showWinner(event);
+        document.getElementById('coach-panel').style.display = 'none';
+        setStatus('Debate complete.');
+        break;
+
+      case 'error':
+        setStatus(`Error: ${event.message}`);
+        break;
+    }
+  };
+
+  ws.onerror = () => setStatus('WebSocket error — is the orchestrator running?');
+  ws.onclose = () => { if (document.getElementById('status-bar').textContent.includes('progress')) setStatus('Connection closed.'); };
+}
+</script>
+</body>
+</html>

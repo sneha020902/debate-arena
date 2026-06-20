@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ollama list *)",
+      "Bash(brew --version)",
+      "Bash(brew install *)",
+      "Bash(brew services *)",
+      "Bash(python3 -m venv venv-emotion)",
+      "Bash(python3 -m venv venv-judge)"
+    ]
+  }
+}
