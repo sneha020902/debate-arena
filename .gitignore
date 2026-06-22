@@ -4,3 +4,9 @@ venv-orchestrator/
 __pycache__/
 *.pyc
 .DS_Store
+PERSONAL_SETUP.md
+PRESENTATION_SCRIPT.md
+generate_ppt.py
+DebateArena_Changes.pptx
+debate-arena-1-sneha.zip
+team_connect.sh

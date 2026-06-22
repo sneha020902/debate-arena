@@ -51,6 +51,7 @@ class DebateConfig(BaseModel):
     ollama_model: str   = Field("qwen2.5:7b",                description="Ollama model name")
     emotion_api:  str   = Field("http://localhost:8000",      description="Emotion API base URL")
     judge_api:    str   = Field("http://localhost:8001",      description="Judge API base URL")
+    es_api:       str   = Field("http://141.54.159.66:8000",  description="Elasticsearch relay API base URL (Webis VPN)")
 
     model_config = {
         "json_schema_extra": {
@@ -156,6 +157,7 @@ async def ws_debate(websocket: WebSocket):
             ollama_model=config.ollama_model,
             emotion_api=config.emotion_api,
             judge_api=config.judge_api,
+            es_api=config.es_api,
         ):
             await websocket.send_text(json.dumps(event))
 

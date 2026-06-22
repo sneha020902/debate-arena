@@ -1,8 +1,8 @@
-# HANDOFF — DebateArena SS26 (Week 7, Kokoro + SLURM Deployment Session)
+# HANDOFF — DebateArena SS26
 **Bauhaus-Universität Weimar · Webis Lab · SS 2026**
-**Sneha Agrawal · Emotion Track**
+**Rosenmeet · Orchestrator + Frontend + Emotion Track**
 
-⚠️ **This supersedes any earlier handoff docs.** Kokoro is now fully deployed and working on SLURM — earlier docs marking it "not started" are outdated.
+⚠️ **This supersedes all earlier handoff docs.**
 
 ---
 
@@ -10,168 +10,151 @@
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Kokoro TTS deployed on SLURM | ✅ Done, tested end-to-end |
-| 2 | Emotion API deployed on SLURM (own account) | ✅ Done, tested end-to-end |
-| 3 | Ollama deployed on SLURM (own account) | ✅ Done, using existing proven method |
-| 4 | Full debate tested with live audio | ✅ Confirmed working |
-| 5 | Frontend audio bugs (overlap, stop, speed) | ✅ Fixed |
-| 6 | Composure vs reasoning density clarified | ✅ Done — composure stays with Emotion track |
+| 1 | ES corpus integration in argument generation | ✅ Done |
+| 2 | Corpus badge UI (⚡ N corpus refs provided) | ✅ Done |
+| 3 | Aggressive base prompts by default | ✅ Done |
+| 4 | Coach steering keyword system (9 keywords + typo tolerance) | ✅ Done |
+| 5 | Coach instruction moved to END of prompt (overrides sentence limit) | ✅ Done |
+| 6 | Kokoro port changed 8003 → 18003 (conflict avoidance) | ✅ Done |
+| 7 | TTS timeout increased 30s → 60s | ✅ Done |
+| 8 | Emotion API auto-reads Kokoro node from ~/kokoro_node.txt | ✅ Done |
+| 9 | English-only output fix (Qwen switching to Chinese) | ✅ Done |
+| 10 | emotional + empathy merged into one, rhetorical keyword added | ✅ Done |
 
 ---
 
-## Architecture (Current, Real)
+## Architecture (Current)
 
 ```
-Frontend (index.html)         — browser, no server
+Frontend (index.html)          — browser, no server needed
       ↕ WebSocket
-Orchestrator :8002             — runs LOCALLY on Mac (venv-orchestrator)
-      ↕ HTTP (via 3 SSH tunnels)
-Emotion API  :8000              — SLURM, qeso3721 account
-Kokoro TTS   :8003              — SLURM, qeso3721 account
-Ollama       :11437             — SLURM, qeso3721 account, GPU (A100)
-Judge API    :8001              — NOT deployed, 404s, falls back to composure winner (fine)
+Orchestrator :8002             — runs locally on your machine
+      ↕ HTTP (via SSH tunnels)
+Emotion API  :8000             — SLURM, your account
+Kokoro TTS   :18003            — SLURM, your account (port changed from 8003)
+Ollama       :11437            — SLURM, your account, GPU (A100)
+ES API       :8000             — webislab37 (141.54.159.66), requires Webis VPN
+Judge API    :8001             — NOT deployed, falls back to composure winner (fine)
 ```
 
-**Important:** All 3 SLURM services currently run on the same node (`gammaweb07`), but this **can change** any time a job is restarted — always check `squeue -u qeso3721` for current hostname.
+**Each team member runs their own services under their own SLURM account.**
+Shared services across accounts do not work due to cluster networking restrictions.
 
 ---
 
-## Why Containers (Important Context)
+## SLURM Startup Order
 
-- Login node Python is **3.14** — too new, breaks `blis`/`spacy`/`torch` installs (both locally on Mac AND on the cluster login node)
-- Fix: run everything inside Pyxis/Enroot containers (`srun --container-image=...`) using `python:3.11-slim`
-- Cluster confirmed to support Pyxis (NOT Singularity, despite earlier assumption)
-- **Critical container flag:** `--container-remap-root` — without it, `apt-get`/`pip install` fail with "requested operation requires superuser privilege"
-- Kokoro needs `espeak-ng` (system package) — add to `apt-get install` line
-- Ollama uses the **official `ollama/ollama:latest` Docker image** (not installed in home dir) — Sneha already had a personal proven script for this (see "Sneha's Ollama Guide" below)
+**Always start Kokoro first — Emotion API reads its node automatically.**
 
----
-
-## Local Project Root
-```
-/Users/snehaagrawal/Desktop/Project/week-7/debate-arena-integrated/
-```
-
-## Cluster Folder Layout (qeso3721 account)
-```
-~/debate-emotion/
-├── kokoro_service/        ← main.py, requirements.txt, run_kokoro.sh
-└── emotion-api/           ← full emotion-api code + run_emotion_api.sh (new)
-```
-
----
-
-## How to Run — Full Restart Checklist
-
-### 1. Check what's already alive
+### Kokoro TTS
 ```bash
-ssh qeso3721@ssh.webis.de
-squeue -u qeso3721
+tmux new -s kokoro
+cd ~/debate-arena-integrated/kokoro_service && bash run_kokoro.sh
 ```
-Look for `kokoro-tts`, `emotion-api`, `ollama-1` (or `ollama_new` tmux session). Note the **current node hostname**.
+- Writes current node to `~/kokoro_node.txt` automatically
+- Wait for: `Uvicorn running on http://0.0.0.0:18003`
+- Detach: `Ctrl+B then D`
 
-### 2. If Kokoro is dead — restart
-```bash
-tmux new -s kokoro   # or: tmux attach -t kokoro if it exists
-cd ~/debate-emotion/kokoro_service
-bash run_kokoro.sh
-```
-Wait for `Uvicorn running on http://0.0.0.0:8003`. Detach: `Ctrl+B` then `D`.
-
-### 3. If Emotion API is dead — restart
+### Emotion API (after Kokoro)
 ```bash
 tmux new -s emotion-api
-cd ~/debate-emotion/emotion-api
-bash run_emotion_api.sh
+cd ~/debate-arena-integrated/emotion-api && bash run_emotion_api.sh
 ```
-This script sets `KOKORO_SERVICE_URL` internally — **must point to Kokoro's current node**, edit inside the script if Kokoro moved to a different node. Wait for `Application startup complete`. Detach.
+- Reads `~/kokoro_node.txt` automatically — no manual sed needed
+- Writes current node to `~/emotion_node.txt`
+- Wait for: `=== Kokoro URL: http://gammaweb0X... ===` then `Application startup complete`
+- Detach: `Ctrl+B then D`
 
-### 4. If Ollama is dead — restart (Sneha's own proven command)
+### Ollama
 ```bash
-tmux new -s ollama_new
-srun --gres=gpu:ampere --container-image=ollama/ollama:latest --job-name=ollama-11437 --container-writable --mem=32GB --pty bash -c "echo \$(hostname) && export OLLAMA_HOST=0.0.0.0:11437 && ollama serve"
+tmux new -s ollama
+srun --gres=gpu:ampere --container-image=ollama/ollama:latest --job-name=ollama-1 --container-writable --mem=32GB --pty bash -c "echo $(hostname) && export OLLAMA_HOST=0.0.0.0:11437 && ollama serve"
 ```
-Wait for `Listening on [::]:11437`. Detach.
-
-### 5. Open 3 SSH tunnels on Mac (separate windows, leave all running silently)
-```bash
-ssh -N -L 8003:<NODE>.medien.uni-weimar.de:8003 qeso3721@ssh.webis.de
-ssh -N -L 8000:<NODE>.medien.uni-weimar.de:8000 qeso3721@ssh.webis.de
-ssh -N -L 11437:<NODE>.medien.uni-weimar.de:11437 qeso3721@ssh.webis.de
-```
-Replace `<NODE>` with whatever `squeue` showed.
-
-### 6. Start orchestrator locally
-```bash
-cd /Users/snehaagrawal/Desktop/Project/week-7/debate-arena-integrated/orchestrator
-source ../venv-orchestrator/bin/activate
-uvicorn main:app --port 8002 --reload
-```
-
-### 7. Open frontend
-```
-frontend/index.html — double-click or `open frontend/index.html`
-```
+- Wait for: `Listening on [::]:11437`
+- Detach: `Ctrl+B then D`
 
 ---
 
-## Frontend Setup Screen Values (Use These, Not the Old Defaults)
-| Field | Value |
+## SSH Tunnels (local machine, 3 separate terminals)
+
+```bash
+ssh -N -L 18003:<KOKORO_NODE>.medien.uni-weimar.de:18003 <username>@ssh.webis.de
+ssh -N -L 8000:<EMOTION_NODE>.medien.uni-weimar.de:8000 <username>@ssh.webis.de
+ssh -N -L 11437:<OLLAMA_NODE>.medien.uni-weimar.de:11437 <username>@ssh.webis.de
+```
+
+Node names change every restart — always check `squeue -u <username>` first.
+
+---
+
+## ES Corpus Integration
+
+- Before each argument, orchestrator queries ES relay at `141.54.159.66:8000/semantic-search`
+- Query: opponent's last argument (or topic for opening turns)
+- Returns top-3 claims from CMV Reddit corpus
+- All 3 claims provided to Ollama prompt as reference points
+- Requires **Webis VPN** — fails silently if unreachable, debate continues normally
+- ES server runs on webislab37: `ssh lab` → `nohup python app.py > app.log 2>&1 &`
+
+### Corpus Badge
+- Shows `⚡ N corpus refs provided` on each argument card
+- Hover reveals the actual claims sent to the LLM
+- Says *provided* not *used* — LLM may or may not have drawn on them
+- No badge = VPN off or ES unreachable
+
+---
+
+## Coach Steering Keywords
+
+| Keyword | Directive |
 |---|---|
-| Ollama Model | `gemma:7b` |
-| Ollama URL | `http://localhost:11437` |
-| Total Turns | 6 (3 rounds) recommended |
+| `statistics` | Back every claim with a number, percentage, or named study |
+| `examples` | Ground every point in a concrete real-world example |
+| `empathy` | Appeal to human suffering and real lives — personal and emotional |
+| `aggressive` | Attack opponent's logic head-on, show no mercy |
+| `calm` | Cold measured authority — let logic demolish them |
+| `realistic` | Only grounded real-world arguments, no hypotheticals |
+| `simple` | Plain language, short sentences, no jargon |
+| `technical` | Deep expertise, precise terminology |
+| `rhetorical` | Rhetorical questions only — never state, always ask |
+
+- Typo tolerant via `difflib` (75% similarity threshold)
+- Coach instruction appended AFTER base prompt so it overrides sentence limits
+- Free-form instructions (no keyword match) pass through directly to LLM
 
 ---
 
-## Known Issue — TTS Occasionally Silent (Real Cause Found)
+## Emotion Scoring
 
-**Symptom:** one argument's audio sometimes doesn't play, no Listen button either.
-
-**Cause (confirmed via orchestrator logs):**
 ```
-WARNING:debate_flow:TTS synthesis failed for role 'llm_a':
-```
-Empty message = timeout. `_synthesize()` in `debate_flow.py` only waits 30s — since Ollama, Kokoro, and emotion-api all share one GPU node, occasional load causes synthesis to exceed that.
-
-**Fix (apply if not already done):** in `orchestrator/debate_flow.py`, inside `_synthesize()`:
-```python
-async with httpx.AsyncClient(timeout=30.0) as client:
-```
-→ change to:
-```python
-async with httpx.AsyncClient(timeout=60.0) as client:
+composure  = 1 − intensity
+intensity  = 0.55 × keyword_score + 0.45 × (anger + disgust + 0.5 × fear)
 ```
 
----
-
-## Frontend Fixes Applied (`frontend/index.html`)
-
-| Fix | What it does |
-|---|---|
-| Unified audio state | Auto-play and manual "Listen" clicks now share one system — only one clip plays at a time, ever |
-| Button reflects real state | Whichever card is playing (auto OR manual) shows **"■ Stop"** live, not just on manual click |
-| Speed control | Small inline dropdown (0.25x–2x) next to status text, applies to whatever's currently playing |
-| Removed | Old separate global "Stop Audio" button (redundant once state was unified) |
-| Safari autoplay fix | A silent `Audio()` play is fired inside the "START DEBATE" click handler to unlock background audio for the session |
-| Emotion label | Shows raw classifier output only — do NOT override with composure-derived labels (tried this, reverted — redundant with composure bar, and hides real model output) |
+- Text emotion model: `j-hartmann/emotion-english-distilroberta-base` (7 labels)
+- Keyword matching: aggressive vs calm word lists (55% weight)
+- Speech emotion module exists (`speech_emotion_module.py`) but not wired into scoring pipeline — text-only currently
+- Composure shown live on each card and top score bar
 
 ---
 
-## Composure vs Reasoning Density (Settled, Don't Re-litigate)
+## Known Issues / Future Work
 
-- **Composure** = Sneha's Emotion API output. Formula: `composure = 1 − intensity`
-- This IS what's currently given to the Logic team
-- Logic team is **not currently using it** — that's fine, not a bug
-- **Reasoning density** = Logic team's own separate internal metric — Sneha does not produce or own this
-
----
-
-## Things NOT Done / Future Work
-- Judge API still not deployed on SLURM (404 fallback works fine for demos)
-- `debate_flow.py` timeout fix — confirm it was actually applied
-- Consider running Kokoro + emotion-api + Ollama on separate nodes if resource contention keeps causing TTS timeouts (would require updating `KOKORO_SERVICE_URL` dynamically)
+- Judge API not deployed — composure fallback works fine for demos
+- Speech emotion module built but unused — could be integrated for richer scoring
+- Corpus badge shows refs *provided* not *used* — detecting actual LLM usage would require semantic similarity comparison
+- Keyword matching (55% of intensity) is context-blind — "not outrageous" still triggers aggressive hit
+- `emotional` and `empathy` were merged — were too similar to produce distinct LLM behaviour
 
 ---
 
-*DebateArena · Sneha Agrawal · Bauhaus-Universität Weimar · SS 2026*
+## Files NOT in Git (gitignored)
+
+- `PERSONAL_SETUP.md` — personal cluster setup notes
+- `PRESENTATION_SCRIPT.md` — presentation script
+- `generate_ppt.py` / `DebateArena_Changes.pptx` — presentation files
+- `team_connect.sh` — teammate tunnel helper (doesn't work across accounts)
+
+---
+
+*DebateArena · Bauhaus-Universität Weimar · SS 2026*

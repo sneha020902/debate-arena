@@ -11,23 +11,34 @@
 
 echo "Requesting compute node and starting Emotion API container..."
 
+# Read current Kokoro node (written by run_kokoro.sh at startup)
+KOKORO_NODE=$(cat "$HOME/kokoro_node.txt" 2>/dev/null || echo "")
+if [ -z "$KOKORO_NODE" ]; then
+  echo "WARNING: kokoro_node.txt not found — start Kokoro first, then restart this."
+  echo "         Falling back to last known node. Audio synthesis may fail."
+  KOKORO_NODE="gammaweb08"
+fi
+echo "Kokoro node: $KOKORO_NODE"
+
 srun \
   --container-image=python:3.11-slim \
-  --container-mounts="$(pwd)":/app \
+  --container-mounts="$(pwd)":/app,"$HOME":/userhome \
   --container-workdir=/app \
   --container-writable \
   --container-remap-root \
   --mem=16GB \
   --cpus-per-task=4 \
-  --time=02:00:00 \
+  --time=08:00:00 \
   --job-name=emotion-api \
   --pty bash -c "
     echo '=== Running on node: '\$(hostname)' ===' && \
+    echo \$(hostname) > /userhome/emotion_node.txt && \
     export DEBIAN_FRONTEND=noninteractive && \
     mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential libsndfile1 ffmpeg > /dev/null && \
-    pip install --no-cache-dir -q -r requirements.txt && \
-    export KOKORO_SERVICE_URL=http://gammaweb07.medien.uni-weimar.de:8003 && \
+    python -m pip install --no-cache-dir -q -r requirements.txt && \
+    export KOKORO_SERVICE_URL=http://${KOKORO_NODE}.medien.uni-weimar.de:18003 && \
+    echo '=== Kokoro URL: '\$KOKORO_SERVICE_URL' ===' && \
     echo '=== Starting Emotion API on port 8000 ===' && \
-    uvicorn main:app --host 0.0.0.0 --port 8000
+    python -m uvicorn main:app --host 0.0.0.0 --port 8000
   "

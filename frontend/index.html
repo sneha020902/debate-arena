@@ -329,6 +329,17 @@
 
   .listen-btn:hover { border-color: var(--teal); color: var(--teal); }
 
+  .corpus-badge {
+    font-size: 0.68rem;
+    font-family: 'Space Mono', monospace;
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.35);
+    border-radius: 5px;
+    padding: 2px 7px;
+    cursor: default;
+    white-space: nowrap;
+  }
+
   /* ── Coach log card ───────────────────────────────────────────────────── */
   .coach-card {
     background: rgba(251,191,36,0.08);
@@ -723,6 +734,11 @@ function addArgumentCard(event) {
   const audiob64 = event.audio_b64;
   const btnId = `listen-btn-${_cardCounter++}`;
 
+  const refs = event.es_references || [];
+  const corpusBadge = refs.length > 0
+    ? `<span class="corpus-badge" title="Claims provided to LLM as reference:\n${escapeHtml(refs.join('\n'))}">⚡ ${refs.length} corpus ref${refs.length > 1 ? 's' : ''} provided</span>`
+    : '';
+
   const card = document.createElement('div');
   card.className = `arg-card ${color}`;
   card.innerHTML = `
@@ -733,6 +749,7 @@ function addArgumentCard(event) {
     <div class="arg-text">${escapeHtml(event.text)}</div>
     <div class="arg-footer">
       <span class="composure-chip">composure ${(comp * 100).toFixed(0)}%</span>
+      ${corpusBadge}
       ${audiob64 ? `<button class="listen-btn" id="${btnId}" onclick="toggleListenAudio('${audiob64}', this)">▶ Listen</button>` : ''}
     </div>
   `;

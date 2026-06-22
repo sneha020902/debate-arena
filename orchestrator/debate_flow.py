@@ -27,20 +27,32 @@ log = logging.getLogger(__name__)
 # ── System prompts for each speaker role ─────────────────────────────────────
 
 _OPENING_PROMPT = (
-    "You are {speaker}, debating the topic: '{topic}'. "
-    "You are arguing {stance}. "
-    "Give a clear, confident opening statement in 2-3 sentences. "
-    "Do not mention you are an AI."
+    "You are {speaker}, a fierce competitive debater arguing {stance} on: '{topic}'. "
+    "Deliver a sharp, confident opening statement. "
+    "Make a bold claim and back it with 1-2 hard-hitting reasons. "
+    "Use strong assertive language — no hedging, no apologies. "
+    "Maximum 3 sentences. Respond in English only. Do not mention you are an AI."
 )
 
 _REBUTTAL_PROMPT = (
-    "You are {speaker}, debating the topic: '{topic}'. "
-    "You are arguing {stance}. "
+    "You are {speaker}, a fierce competitive debater arguing {stance} on: '{topic}'. "
     "Your opponent just said: \"{opponent_argument}\". "
-    "First, directly rebut that point in one sentence. "
-    "Then advance a new argument of your own in 1-2 sentences. "
-    "Total: 2-3 sentences. Do not mention you are an AI."
+    "First, tear apart the weakest point of their argument in one sharp sentence. "
+    "Then drive home a new argument they have not addressed. "
+    "Be direct, aggressive, and uncompromising. Maximum 3 sentences. Respond in English only. Do not mention you are an AI."
 )
+
+_COACH_DIRECTIVES = {
+    "statistics":  "Back every claim with a specific number, percentage, or named study. Facts over rhetoric.",
+    "examples":    "Ground every point in a concrete real-world example — name a country, event, or person.",
+    "empathy":     "Appeal to human suffering and real-world consequences. Speak about specific people and real lives affected — make it personal, emotional, and impossible to ignore.",
+    "aggressive":  "Attack the opponent's logic head-on. Use words like 'absurd', 'dangerously naive', 'completely fails'. Show no mercy.",
+    "calm":        "Speak with cold, measured authority. No emotional language — let the logic demolish them.",
+    "realistic":   "Use only grounded, real-world arguments. No hypotheticals — cite what is actually happening today.",
+    "simple":      "Use plain language anyone can understand. Short sentences, everyday words, no jargon.",
+    "technical":   "Go deep — use precise terminology, cite mechanisms, show you understand the topic at an expert level.",
+    "rhetorical":  "Use rhetorical questions to challenge the opponent. Make the audience question what they believe — never state, always ask.",
+}
 
 # ── Coach steering ────────────────────────────────────────────────────────────
 # A coach can inject a one-off instruction (e.g. "be more aggressive") that gets
@@ -84,12 +96,40 @@ def _consume_steering(is_llm_a: bool) -> str | None:
     return instruction
 
 
+async def _fetch_es_references(es_api: str, query: str, top_n: int = 3) -> list:
+    """
+    Fetch semantically similar arguments from the ES relay server.
+    Returns [] silently if the VPN is off or the server is unreachable.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                f"{es_api}/semantic-search",
+                json={"argument": query, "top_n": top_n, "quality_only": False, "min_score": 1.3},
+            )
+            resp.raise_for_status()
+            return resp.json().get("similar_arguments", [])
+    except Exception:
+        return []
+
+
 async def _generate_argument(
     ollama_url: str,
     model: str,
     prompt: str,
+    references: list | None = None,
 ) -> str:
     """Call Ollama and return the generated text."""
+    reference_block = ""
+    if references:
+        claims = [r.get("claim", "").strip() for r in references if r.get("claim", "").strip()]
+        if claims:
+            reference_block = (
+                "\n\nRelevant reference points from the debate corpus (use as inspiration — do not copy verbatim):\n"
+                + "".join(f"- {c}\n" for c in claims)
+            )
+        prompt = prompt + reference_block
+
     payload = {
         "model": model,
         "prompt": prompt,
@@ -131,7 +171,7 @@ async def _synthesize(emotion_api: str, text: str, speaker_role: str, style: str
     or None if synthesis fails (debate continues without audio).
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{emotion_api}/synthesize",
                 json={"text": text, "provider": "kokoro", "speaker_role": speaker_role, "style": style},
@@ -188,6 +228,7 @@ async def run_debate(
     ollama_model: str,
     emotion_api: str,
     judge_api: str,
+    es_api: str = "http://141.54.159.66:8000",
 ) -> AsyncIterator[dict]:
     """
     Async generator that yields debate events as dicts.
@@ -236,18 +277,23 @@ async def run_debate(
 
         coach_instruction = _consume_steering(is_llm_a)
         if coach_instruction:
-            prompt = (
-                f"COACH INSTRUCTION (mandatory): {coach_instruction}. "
-                f"Concretely: use short punchy sentences, strong emotionally charged words "
-                f"(e.g. 'absurd', 'dangerously naive', 'completely fails'), express visible frustration "
-                f"or urgency, and challenge the opponent directly by name rather than abstractly. "
-                f"Do not soften your tone with hedging phrases like 'while it's true' or 'admittedly'. "
-                f"\n\n{prompt}"
-            )
+            from difflib import get_close_matches
+            words = coach_instruction.lower().split()
+            directive = coach_instruction
+            for word in words:
+                matches = get_close_matches(word, _COACH_DIRECTIVES.keys(), n=1, cutoff=0.75)
+                if matches:
+                    directive = _COACH_DIRECTIVES[matches[0]]
+                    break
+            prompt = f"{prompt}\n\nCOACH OVERRIDE (supersedes everything above): {directive}"
+
+        # Fetch ES references (uses opponent's last arg, or topic for opening)
+        es_query = (last_b_arg if is_llm_a else last_a_arg) or topic
+        references = await _fetch_es_references(es_api, es_query)
 
         # Generate + score + synthesise in parallel where possible
         try:
-            argument_text = await _generate_argument(ollama_url, ollama_model, prompt)
+            argument_text = await _generate_argument(ollama_url, ollama_model, prompt, references)
         except Exception as exc:
             yield {"type": "error", "message": f"Ollama generation failed: {exc}"}
             return
@@ -273,6 +319,7 @@ async def run_debate(
         }
         transcript.append(turn_record)
 
+        ref_claims = [r.get("claim", "").strip() for r in references if r.get("claim", "").strip()]
         yield {
             "type": "argument",
             "speaker": speaker,
@@ -281,6 +328,7 @@ async def run_debate(
             "text": argument_text,
             "scores": scores,
             "audio_b64": audio_b64,
+            "es_references": ref_claims,
         }
 
         # ── Pause check after each argument ──────────────────────────────

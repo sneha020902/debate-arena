@@ -35,19 +35,21 @@ echo "Requesting compute node and starting Kokoro TTS container..."
 
 srun \
   --container-image=python:3.11-slim \
-  --container-mounts="$(pwd)":/app \
+  --container-mounts="$(pwd)":/app,"$HOME":/userhome \
   --container-workdir=/app \
   --container-writable \
   --container-remap-root \
   --mem=4GB \
   --cpus-per-task=2 \
   --job-name=kokoro-tts \
+  --exclude=gammaweb05 \
   --pty bash -c "
     echo '=== Running on node: '\$(hostname)' ===' && \
+    echo \$(hostname) > /userhome/kokoro_node.txt && \
     export DEBIAN_FRONTEND=noninteractive && \
     mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential libsndfile1 espeak-ng > /dev/null && \
-    pip install --no-cache-dir -q -r requirements.txt && \
-    echo '=== Starting Kokoro TTS service on port 8003 ===' && \
-    uvicorn main:app --host 0.0.0.0 --port 8003
+    python -m pip install --no-cache-dir -q -r requirements.txt && \
+    echo '=== Starting Kokoro TTS service on port 18003 ===' && \
+    python -m uvicorn main:app --host 0.0.0.0 --port 18003
   "

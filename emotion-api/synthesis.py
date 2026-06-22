@@ -83,7 +83,7 @@ async def synthesize_to_bytes(
     speed = KOKORO_SPEED_PRESETS.get(style, 1.0)
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{KOKORO_SERVICE_URL}/synthesize",
                 json={"text": text, "voice": resolved_voice, "speed": speed},
