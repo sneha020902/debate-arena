@@ -62,7 +62,7 @@ srun \
     export DEBIAN_FRONTEND=noninteractive && \
     mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential > /dev/null && \
-    pip install --cache-dir /userhome/.cache/pip -q \
+    python -m pip install --cache-dir /userhome/.cache/pip -q \
       fastapi 'uvicorn[standard]' pydantic httpx requests ollama \
       sentence-transformers datasets numpy python-dotenv && \
     export OLLAMA_HOST=http://${OLLAMA_NODE}.medien.uni-weimar.de:11437 && \
