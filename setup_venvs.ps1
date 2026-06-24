@@ -28,6 +28,7 @@ Write-Host "`n=== 3/3  venv-orchestrator  (Orchestrator) ===" -ForegroundColor C
 & $python -m venv venv-orchestrator
 .\venv-orchestrator\Scripts\pip install --upgrade pip
 .\venv-orchestrator\Scripts\pip install `
-    fastapi uvicorn[standard] httpx pydantic websockets
+    fastapi uvicorn[standard] httpx pydantic websockets `
+    sentence-transformers datasets numpy requests
 
 Write-Host "`n=== Done! Run .\run.ps1 to start everything. ===" -ForegroundColor Green

@@ -28,8 +28,9 @@ srun \
   --container-remap-root \
   --mem=16GB \
   --cpus-per-task=4 \
-  --time=08:00:00 \
+  --time=24:00:00 \
   --job-name=emotion-api \
+  --exclude=gammaweb05 \
   --pty bash -c "
     echo '=== Running on node: '\$(hostname)' ===' && \
     echo \$(hostname) > /userhome/emotion_node.txt && \

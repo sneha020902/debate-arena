@@ -41,6 +41,7 @@ srun \
   --container-remap-root \
   --mem=4GB \
   --cpus-per-task=2 \
+  --time=24:00:00 \
   --job-name=kokoro-tts \
   --exclude=gammaweb05 \
   --pty bash -c "

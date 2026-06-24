@@ -30,7 +30,7 @@ ES_API = os.getenv("ES_API", "http://141.54.159.66:8000")
 EMOTION_API = os.getenv("EMOTION_API", "http://localhost:8000")
 
 # Ollama for the LLM-as-judge fallback. OLLAMA_HOST overrides the default node.
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11437")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 
 # ── ES score handling ───────────────────────────────────────────────────────

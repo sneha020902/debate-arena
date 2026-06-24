@@ -8,7 +8,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command",
     "cd '$root\emotion-api'; ..\venv-emotion\Scripts\uvicorn main:app --port 8000 --reload"
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command",
-    "cd '$root\judge-api'; ..\venv-judge\Scripts\uvicorn main:app --port 8001 --reload"
+    "cd '$root\judge-api'; ..\venv-judge\Scripts\uvicorn run_full:app --port 8001 --reload"
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command",
     "cd '$root\orchestrator'; ..\venv-orchestrator\Scripts\uvicorn main:app --port 8002 --reload"

@@ -46,11 +46,16 @@ class Turn(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_aliases(cls, data):
-        if isinstance(data, dict) and "argument" not in data:
-            for alt in ("text", "content", "message"):
-                if alt in data:
-                    data = {**data, "argument": data[alt]}
-                    break
+        if isinstance(data, dict):
+            if "argument" not in data:
+                for alt in ("text", "content", "message"):
+                    if alt in data:
+                        data = {**data, "argument": data[alt]}
+                        break
+            if "speaker" not in data and "speaker_id" in data:
+                data = {**data, "speaker": data["speaker_id"]}
+            if "turn" not in data and "round" in data:
+                data = {**data, "turn": data["round"]}
         return data
 
     # Example shown in Swagger (replaces the unhelpful ["string"]).

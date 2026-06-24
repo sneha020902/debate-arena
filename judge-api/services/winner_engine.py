@@ -279,6 +279,7 @@ def judge_debate(topic: str, turns: list, weights: dict = None,
         "winner": winner,
         "margin": margin,
         "verdict": verdict,
+        "explanation": verdict,
         "weights_used": {k: round(v, 3) for k, v in norm_w.items()},
         "teams": {
             a: {**teams[a], "explanation": _explain(a)},
